@@ -63,6 +63,28 @@ def pnl_composite(df: pd.DataFrame, weights: dict | None = None) -> pd.Series:
     return _pr(score)
 
 
+def net_profit_composite(df: pd.DataFrame, weights: dict | None = None) -> pd.Series:
+    """
+    Net-profit exploit: the validated REVENUE base (spend + revolve, from leaderboard probes)
+    MINUS cost and risk terms, all as percentile ranks. Default weights are a starting point;
+    calibrate each cost term's weight from its own probe (subtract more if it scored < 0.20).
+        Profit ~ w_s*rank(spend) + w_r*rank(f1)
+                 − w_redeem*rank(f21) − w_benefit*rank(f13+f14+f15+f16)
+                 − w_risk*rank(f11*(f1+f17))   [expected credit loss = risk × exposure]
+    """
+    w = {"spend": 0.573, "revolve": 0.427, "redeem": 0.15, "benefit": 0.15, "risk": 0.10}
+    if weights:
+        w.update(weights)
+    spend = _pr(_col(df, "f6") + _col(df, "f7") + _col(df, "f8") + _col(df, "f9") + _col(df, "f10"))
+    revolve = _pr(_col(df, "f1"))
+    redeem = _pr(_col(df, "f21"))
+    benefit = _pr(_col(df, "f13") + _col(df, "f14") + _col(df, "f15") + _col(df, "f16"))
+    risk = _pr(_col(df, "f11") * (_col(df, "f1") + _col(df, "f17")))
+    score = (w["spend"] * spend + w["revolve"] * revolve
+             - w["redeem"] * redeem - w["benefit"] * benefit - w["risk"] * risk)
+    return _pr(score)
+
+
 def build_candidates(df: pd.DataFrame) -> dict[str, pd.Series]:
     """Return {name: score Series}. Higher score = predicted MORE profitable. Composites
     combine PERCENTILE RANKS (standardized), never raw dollars."""
@@ -91,6 +113,15 @@ def build_candidates(df: pd.DataFrame) -> dict[str, pd.Series]:
         # --- the exploit (H2): standardized multi-term P&L composite (default weights) ---
         "pnl_composite_v1":   pnl_composite(df),
         "revenue_only":       _pr(_pr(cats) + 0.6 * _pr(c("f1")) + 0.6 * _pr(c("f17") + c("f18"))),
+        # --- validated revenue base (the current best = 0.726 on the leaderboard) ---
+        "spend_revolve_base": _pr(0.573 * _pr(cats) + 0.427 * _pr(c("f1"))),
+        # --- NET-PROFIT exploit: revenue base minus cost/risk (default weights) ---
+        "net_profit_v1":      net_profit_composite(df),
+        # --- single COST/RISK diagnostic probes (submit -> score < 0.20 means SUBTRACT it) ---
+        "risk_f11":           _pr(c("f11")),
+        "benefit_cost":       _pr(c("f13") + c("f14") + c("f15") + c("f16")),
+        "cancel_f2":          _pr(c("f2")),
+        "collection_f3":      _pr(c("f3")),
     }
     return cand
 
