@@ -15,8 +15,12 @@ dollar-P&L equation that reproduces all nine scores simultaneously (validated at
 recovery on simulated truths — landed 0.900). Winning file: **`outputs/FINAL_INVERSE_FIT.xlsx`**;
 method: **`docs/inverse_calibration.md`**; history: **`docs/leaderboard_results.md`**.
 
-Final model: `rank( 0.573·rank(Σ f6..f10 spend) + 0.427·rank(f1 revolve) − 0.18·rank(f11·f1)
-− 0.15·rank(f3) − 0.06·rank(f21) )` — a leaderboard-calibrated `Revenue − Cost − Risk` P&L.
+Final model: a consensus of six independently-fitted **dollar P&L equations** (per-category
+interchange margins, revolve interest, fee revenue, benefit/points costs, servicing, expected
+loss `f11·f1`, collection `f3 + f3·f1`, cancellations) — each of which reproduces all nine of
+our graded submissions' scores to ±0.005. Fitted coefficients:
+`outputs/inverse_fit_coefficients.json`. The earlier hand-calibrated rank model
+(`0.573·rank(Σ f6..f10) + 0.427·rank(f1) − costs`, 0.768) remains as the interpretable baseline.
 
 ---
 
