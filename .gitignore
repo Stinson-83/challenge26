@@ -1,0 +1,18 @@
+# Real competition data (do not commit — download from Unstop)
+data/train.csv
+data/test.csv
+data/*.xlsx
+data/*.parquet
+
+# Generated artefacts
+outputs/*.csv
+outputs/*.png
+outputs/*.json
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store

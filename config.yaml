@@ -1,0 +1,212 @@
+# =====================================================================================
+# Amex Campus Challenge 2026 — Round 1 : Configuration
+# -------------------------------------------------------------------------------------
+# Single source of truth for column semantics, feature-role inference and the weights of
+# each profitability framework. Everything downstream reads from here so that switching
+# scoring strategies is a one-line change.
+#
+# IMPORTANT: The true column meanings are MASKED by Amex. We encode our *inferred* mapping
+# here with an explicit `confidence`. The pipeline ALSO auto-detects roles from statistical
+# signatures and flags disagreements, so a wrong guess degrades gracefully rather than
+# silently corrupting the score.
+# =====================================================================================
+
+data:
+  id_column: id                 # unique_identifier — MUST be excluded from every equation
+  # Path is resolved relative to project root. Drop the real Unstop file here.
+  train_file: data/train.csv
+  # Fallback used for end-to-end validation when the real file is absent.
+  synthetic_fallback: true
+
+# -------------------------------------------------------------------------------------
+# Auto-detection thresholds (used by preprocessing.infer_column_roles)
+# -------------------------------------------------------------------------------------
+autodetect:
+  ratio_max: 1.05               # continuous values essentially within [0,1] -> ratio/probability
+  count_max_unique: 40          # few unique non-negative integers -> count
+  count_max_value: 400          # ... and small magnitude
+  rare_flag_frac: 0.15          # binary positive rate below this -> rare event flag
+  dollar_min_range: 500         # wide continuous range -> monetary amount
+  skew_dollar_min: 1.5          # right-skew typical of spend/balance
+  id_unique_frac: 0.98          # near-unique monotonic integer -> identifier
+
+# -------------------------------------------------------------------------------------
+# TRUE semantic map — feature meanings are now KNOWN (data/feature_description.csv).
+# Remaining uncertainty is only the SIGN/WEIGHT in the profit equation (business modelling),
+# NOT feature identity, so confidences are high. economic_role in:
+#   revenue | cost | risk | engagement | relationship | identifier
+# profit_sign in: positive | negative | ambiguous | exclude
+# group is the aggregation bucket the profitability frameworks operate on.
+# -------------------------------------------------------------------------------------
+semantics:
+  # --- SPEND (dominant REVENUE via interchange = net margin * spend) ---
+  # f5 = TOTAL spend (the primary driver). f6..f10 are its category components (used for the
+  # 5x rewards-margin adjustment, NOT re-summed into the total => no double count).
+  f5:  {meaning: "Total Spend in last 12m (PRIMARY revenue driver)", category: spend_balance, economic_role: revenue, profit_sign: positive, group: spend,       confidence: 0.95}
+  f6:  {meaning: "Airlines Spend 12m (5x category, thin net margin)", category: spend_balance, economic_role: revenue, profit_sign: positive, group: spend_cat_5x, confidence: 0.92}
+  f9:  {meaning: "Lodging Spend 12m (5x category, thin net margin)",  category: spend_balance, economic_role: revenue, profit_sign: positive, group: spend_cat_5x, confidence: 0.92}
+  f7:  {meaning: "Other Spend 12m (1x category)",         category: spend_balance, economic_role: revenue, profit_sign: positive, group: spend_cat_1x, confidence: 0.92}
+  f8:  {meaning: "Entertainment Spend 12m (1x category)", category: spend_balance, economic_role: revenue, profit_sign: positive, group: spend_cat_1x, confidence: 0.92}
+  f10: {meaning: "Dining Spend 12m (1x category)",        category: spend_balance, economic_role: revenue, profit_sign: positive, group: spend_cat_1x, confidence: 0.92}
+  f1:  {meaning: "Average Revolve Balance 12m (net interest income + credit exposure)", category: spend_balance, economic_role: revenue, profit_sign: positive, group: revolve, confidence: 0.90}
+  # --- Credit lines (affluence / capacity proxy; also exposure) ---
+  f17: {meaning: "Total Lend Line Amount (credit capacity / affluence proxy)", category: profile, economic_role: relationship, profit_sign: positive, group: credit_line, confidence: 0.85}
+  f18: {meaning: "Total Consumer Lend Line Amount (subset of f17; redundant)", category: profile, economic_role: relationship, profit_sign: positive, group: credit_line, confidence: 0.85}
+  # --- Points / loyalty (spend corroborator + engagement; weak positive) ---
+  f4:  {meaning: "Rewards Points Balance (accrues with spend; also unredeemed liability)", category: engagement, economic_role: engagement, profit_sign: positive, group: points, confidence: 0.90}
+  f21: {meaning: "Rewards Points Redeemed 12m (active-use / engagement signal)", category: engagement, economic_role: engagement, profit_sign: positive, group: points, confidence: 0.90}
+  # --- Engagement (digital + marketing) ---
+  f12: {meaning: "Login Counts to website (digital engagement)", category: engagement, economic_role: engagement, profit_sign: positive, group: engagement, confidence: 0.90}
+  f22: {meaning: "Emails Opened last 6m (marketing engagement)", category: engagement, economic_role: engagement, profit_sign: positive, group: engagement, confidence: 0.90}
+  f23: {meaning: "Emails Clicked last 6m (marketing engagement)", category: engagement, economic_role: engagement, profit_sign: positive, group: engagement, confidence: 0.90}
+  # --- Relationship depth ---
+  f19: {meaning: "Number of Supplementary Accounts (relationship depth => more household spend)", category: engagement, economic_role: relationship, profit_sign: positive, group: relationship, confidence: 0.90}
+  f20: {meaning: "Count of Active Charge Cards (relationship depth)", category: engagement, economic_role: relationship, profit_sign: positive, group: relationship, confidence: 0.90}
+  # --- Risk ---
+  f11: {meaning: "Average Risk Score 12m (higher = riskier => expected credit loss)", category: profile, economic_role: risk, profit_sign: negative, group: risk, confidence: 0.90}
+  # --- Attrition / credit distress ---
+  f2:  {meaning: "Cancellation Calls 12m (attrition intent)", category: profile, economic_role: risk, profit_sign: negative, group: attrition, confidence: 0.90}
+  f3:  {meaning: "Cancellation Calls due to Collection (SEVERE credit distress / delinquency)", category: profile, economic_role: risk, profit_sign: negative, group: collection, confidence: 0.90}
+  # --- Benefit redemption COSTS (cash Amex pays out) ---
+  f13: {meaning: "Lounge Access Count (issuer pays per visit)", category: benefit_usage, economic_role: cost, profit_sign: negative, group: benefit_cost, confidence: 0.90}
+  f14: {meaning: "Credits used in Airlines ($ redeemed)", category: benefit_usage, economic_role: cost, profit_sign: negative, group: benefit_cost, confidence: 0.90}
+  f15: {meaning: "Cab benefits usage (credit redeemed)", category: benefit_usage, economic_role: cost, profit_sign: negative, group: benefit_cost, confidence: 0.90}
+  f16: {meaning: "Entertainment Credit Used Amount ($ redeemed)", category: benefit_usage, economic_role: cost, profit_sign: negative, group: benefit_cost, confidence: 0.90}
+
+# -------------------------------------------------------------------------------------
+# Profitability frameworks. Weights act on STANDARDISED, sign-corrected group scores
+# (each group -> robust 0..1 percentile score), so weights are directly comparable.
+# Switch the active primary via `active_framework`.
+# -------------------------------------------------------------------------------------
+frameworks:
+  active_framework: rank_ensemble
+
+  # 1) Revenue-first: total spend (f5) dominates; everything else is a light touch. Keep
+  #    combined non-spend weight small so it can shift a member only a few percentile points
+  #    and never overturn a full spend decile.
+  revenue_first:
+    spend: 1.00                  # f5 Total Spend
+    spend_cat: 0.15              # f6..f10 category-sum corroborator (~= f5)
+    revolve: 0.12                # f1 interest revenue
+    credit_line: 0.05            # f17/f18 affluence proxy
+    points: 0.05                 # f4/f21 spend/loyalty corroborator
+    engagement: 0.03
+    risk: -0.05
+    weights_note: "Charge-card profit ~ interchange = margin*spend; total spend dominates."
+
+  # 2) Full P&L (group-based): Revenue - Cost - RiskLoss with every lever.
+  full_pnl:
+    spend: 1.00
+    spend_cat: 0.15
+    revolve: 0.20
+    credit_line: 0.05
+    engagement: 0.06
+    relationship: 0.08
+    points: 0.05
+    benefit_cost: -0.12
+    risk: -0.18
+    attrition: -0.10
+    collection: -0.15            # severe credit-distress signal
+    weights_note: "Balanced unit-economics P&L on robust group scores."
+
+  # 3) Risk-adjusted: revenue discounted MULTIPLICATIVELY by risk, attrition & collection.
+  risk_adjusted:
+    spend: 1.00
+    spend_cat: 0.15
+    revolve: 0.20
+    credit_line: 0.05
+    risk: -0.35
+    attrition: -0.15
+    collection: -0.25
+    benefit_cost: -0.08
+    weights_note: "Tail losses from high-risk revolvers/collection cases dominate downside."
+
+  # 4) Relationship / coupon-clipper-aware: rewards engaged power-users, penalises
+  #    perk-harvesters (high benefit utilisation relative to spend).
+  relationship:
+    spend: 0.90
+    spend_cat: 0.12
+    engagement: 0.12
+    relationship: 0.12
+    points: 0.06
+    revolve: 0.12
+    credit_line: 0.05
+    benefit_efficiency: -0.15    # benefit usage NOT justified by spend
+    risk: -0.12
+    attrition: -0.10
+    collection: -0.15
+    weights_note: "Separates profitable power-users from unprofitable value-extractors."
+
+  # 5) Dollar-grounded P&L: computed in RAW DOLLARS (not group scores), so it can encode the
+  #    5x-rewards drag on Airlines+Lodging (f6+f9) and literal cost sizes. Built in code.
+  dollar_pnl:
+    discount_rate: 0.022         # merchant discount (interchange) on total spend f5
+    rewards_rate: 0.011          # blended base rewards cost on total spend
+    rewards_drag_5x: 0.008       # extra rewards drag on Airlines(f6)+Lodging(f9) 5x spend.
+                                 # net 5x margin = 0.022-0.011-0.008 = +0.003 (thin but
+                                 # POSITIVE) vs 1x margin +0.011 — 5x ranks lower, not inverted.
+    interest_rate: 0.15          # net interest income on revolving balance f1
+    lounge_cost: 35.0            # $ issuer cost per lounge visit (f13)
+    cab_cost: 15.0               # $ per cab benefit use (f15) when f15 is a count
+    airline_credit_coef: 1.0     # f14 is already $ redeemed
+    entertainment_credit_coef: 1.0  # f16 is already $ redeemed
+    servicing_call: 30.0         # $ per cancellation call (f2)
+    collection_cost: 250.0       # $ per collection-driven cancel call (f3) — distress
+    lgd: 1.0                     # loss-given-default multiplier on f11 * f1 exposure
+    weights_note: "Directly encodes Profit = Revenue - Cost - Expected Risk Loss in $."
+
+  # 6) Rank ensemble (RECOMMENDED PRIMARY): rank-average of the ROBUST group-based members
+  #    (built in code). dollar_pnl is deliberately EXCLUDED — it uses absolute-dollar cost
+  #    magnitudes that are the least robust to coefficient uncertainty. Member weights are
+  #    business-prior confidences, NOT fitted to any data (fitting to the synthetic truth
+  #    would overfit our own assumptions and not transfer to the real leaderboard).
+  rank_ensemble:
+    members: [dollar_pnl, revenue_first, relationship, full_pnl]
+    member_weights: [0.40, 0.25, 0.20, 0.15]
+    weights_note: >
+      Rank-averaged. dollar_pnl gets the PLURALITY because Amex's true target is itself a
+      dollar P&L (Profit = Revenue - Cost - Risk), so the literal dollar model is the best
+      structural match; revenue_first/relationship/full_pnl are robustness ballast that
+      hedge coefficient mis-specification. risk_adjusted is excluded (its multiplicative
+      risk discount is most sensitive to the f11 risk-sign uncertainty). The pipeline also
+      emits EVERY framework as its own submission file so the PUBLIC LEADERBOARD — not our
+      synthetic proxy — makes the final call between pure dollar_pnl and this ensemble.
+
+# -------------------------------------------------------------------------------------
+# Optional boundary guards (final precision protection). Narrow by design so they touch
+# only the genuinely dangerous handful, then backfill freed top-20% slots from clean
+# survivors. Validated on synthetic before enabling; keep conservative on real data.
+# -------------------------------------------------------------------------------------
+guards:
+  enable: false                  # turn on only if validation shows it helps
+  loss_screen: true              # exclude high-PD high-balance revolvers & cancellers
+  pd_pct: 0.90                   # f11 above this percentile ...
+  balance_pct: 0.75              # ... AND f1 above this percentile -> exclude
+  coupon_clipper: true           # exclude below-median-spend members with benefit efficiency < 1
+
+feature_engineering:
+  winsorize_pct: [0.01, 0.99]
+  log1p_dollars: true
+  percentile_ranks: true
+  robust_scale: true
+
+clustering:
+  kmeans_k: 6
+  gmm_k: 6
+  dbscan_eps: 1.5
+  dbscan_min_samples: 50
+  # O(n^2) memory methods must subsample hard. Agglomerative builds an n x n distance
+  # matrix (5000^2 floats ~= 0.2GB is safe; 50000^2 ~= 20GB OOM-kills a 15GB box).
+  hierarchical_sample: 5000      # Agglomerative cap
+  sample_for_heavy: 20000        # DBSCAN / LOF cap
+  analysis_sample_max: 80000     # subsample cap for clustering/PCA/outliers/plots on big data
+                                 # (the submission scores always use ALL rows)
+
+submission:
+  top_pct: 0.20                  # evaluation cut = top 20%
+  out_file: outputs/submission.csv
+  # Column names are overwritten to match the Unstop template at build time.
+  id_out_name: id
+  score_out_name: profitability_score
+
+random_seed: 42
