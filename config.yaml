@@ -161,8 +161,16 @@ frameworks:
   #    business-prior confidences, NOT fitted to any data (fitting to the synthetic truth
   #    would overfit our own assumptions and not transfer to the real leaderboard).
   rank_ensemble:
-    members: [dollar_pnl, revenue_first, relationship, full_pnl]
-    member_weights: [0.40, 0.25, 0.20, 0.15]
+    members: [revenue_first, relationship, full_pnl, risk_adjusted]
+    member_weights: [0.30, 0.25, 0.25, 0.20]
+    weights_note_v2: >
+      UPDATED after the real-data (500k) run. dollar_pnl was REMOVED from the primary: on the
+      real column scales its interest term (0.15*f1) is ~5x its interchange term (0.022*f5)
+      and its benefit costs exceed interchange, so it ranks by revolve-balance + cost rather
+      than SPEND, landing near-orthogonal to every other framework (24-29% top-20% overlap,
+      rank-corr ~0.13). The ensemble now averages the four SCALE-ROBUST (percentile-rank)
+      spend-dominant frameworks, which agree 82-97%. dollar_pnl remains available standalone
+      for leaderboard A/B testing. See docs/real_data_findings.md.
     weights_note: >
       Rank-averaged. dollar_pnl gets the PLURALITY because Amex's true target is itself a
       dollar P&L (Profit = Revenue - Cost - Risk), so the literal dollar model is the best
