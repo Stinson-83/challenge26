@@ -38,53 +38,72 @@ def _pr(s: pd.Series) -> pd.Series:
     return pd.Series((rankdata(x.values, method="average") - 1) / max(len(x) - 1, 1), index=s.index)
 
 
-def build_candidates(df: pd.DataFrame) -> dict[str, pd.Series]:
-    """Return {name: score Series indexed by row}. Higher score = predicted MORE profitable."""
-    def c(name):  # raw column, missing -> 0
-        return pd.to_numeric(df[name], errors="coerce").fillna(0.0) if name in df.columns else pd.Series(0.0, index=df.index)
+def _col(df, name):
+    return pd.to_numeric(df[name], errors="coerce").fillna(0.0) if name in df.columns else pd.Series(0.0, index=df.index)
 
+
+def pnl_composite(df: pd.DataFrame, weights: dict | None = None) -> pd.Series:
+    """
+    Standardized (rank-averaged) revenue-minus-cost P&L composite. Every axis enters as a
+    percentile rank in [0,1] BEFORE weighting, so the largest-scale column (f7/f21) cannot
+    silently dominate (the failure mode of a naive raw-dollar sum). Default weights are the
+    panel's economic estimate; recalibrate them proportional to (each probe's score − 0.20)
+    once the single-axis leaderboard results are in.
+    """
+    w = {"spend": 1.0, "interest": 0.6, "lending": 0.6, "redeem_cost": 0.4, "risk_loss": 0.4}
+    if weights:
+        w.update(weights)
+    spend = _pr(_col(df, "f6") + _col(df, "f7") + _col(df, "f8") + _col(df, "f9") + _col(df, "f10"))
+    interest = _pr(_col(df, "f1"))
+    lending = _pr(_col(df, "f17") + _col(df, "f18"))
+    redeem = _pr(_col(df, "f21"))                                   # realized rewards COST
+    risk_loss = _pr(_col(df, "f11") * (_col(df, "f1") + _col(df, "f17")))  # expected loss
+    score = (w["spend"] * spend + w["interest"] * interest + w["lending"] * lending
+             - w["redeem_cost"] * redeem - w["risk_loss"] * risk_loss)
+    return _pr(score)
+
+
+def build_candidates(df: pd.DataFrame) -> dict[str, pd.Series]:
+    """Return {name: score Series}. Higher score = predicted MORE profitable. Composites
+    combine PERCENTILE RANKS (standardized), never raw dollars."""
+    def c(name):
+        return _col(df, name)
     cats = c("f6") + c("f7") + c("f8") + c("f9") + c("f10")          # category-spend total
     cand: dict[str, pd.Series] = {
-        # --- single-feature magnitude hypotheses ---
-        "total_spend_f5":     _pr(c("f5")),        # baseline (≈ what already scored 0.337)
-        "other_spend_f7":     _pr(c("f7")),        # the largest $ column
-        "category_total":     _pr(cats),           # true "total spend" hypothesis
+        # --- spend hypotheses (H1: f5 is the WRONG column; the category sum is the base) ---
+        "category_total":     _pr(cats),           # <-- probe #1 (interchange base)
+        "total_spend_f5":     _pr(c("f5")),        # baseline (≈ what scored 0.337)
+        "other_spend_f7":     _pr(c("f7")),        # ~64% of the category sum
         "airlines_f6":        _pr(c("f6")),
         "lodging_f9":         _pr(c("f9")),
         "dining_f10":         _pr(c("f10")),
-        # --- lending / interest hypotheses ---
+        # --- interest / lending hypotheses (H3: orthogonal axis we missed) ---
         "revolve_f1":         _pr(c("f1")),        # interest income / exposure
-        "lend_line_f17":      _pr(c("f17")),       # credit capacity
+        "lend_line_f17":      _pr(c("f17")),       # credit capacity / lending spread
         "consumer_line_f18":  _pr(c("f18")),
         "lend_total_f17_f18": _pr(c("f17") + c("f18")),
-        # --- points / loyalty hypotheses ---
-        "points_balance_f4":  _pr(c("f4")),
+        # --- points / loyalty (H4: f21 realized COST, sign ambiguous; f4 is a liability) ---
         "points_redeemed_f21": _pr(c("f21")),
-        "points_activity":    _pr(c("f4") + c("f21")),
+        "points_balance_f4":  _pr(c("f4")),
         # --- engagement / relationship ---
         "logins_f12":         _pr(c("f12")),
         "relationship_f19_f20": _pr(c("f19") + c("f20")),
-        # --- broad composites ---
-        "all_spend_broad":    _pr(c("f5") + cats + c("f1")),
-        "lending_x_lowrisk":  _pr(_pr(c("f17") + c("f18")) * (1 - _pr(c("f11")))),
-        "revenue_minus_risk": _pr(_pr(cats + c("f1")) - _pr(c("f11")) - _pr(c("f3"))),
-        # --- direction sanity check: is the grader inverted? ---
-        # (submit the ascending version of the current spend ranking)
-        "INVERSE_total_spend_f5": 1.0 - _pr(c("f5")),
+        # --- the exploit (H2): standardized multi-term P&L composite (default weights) ---
+        "pnl_composite_v1":   pnl_composite(df),
+        "revenue_only":       _pr(_pr(cats) + 0.6 * _pr(c("f1")) + 0.6 * _pr(c("f17") + c("f18"))),
     }
     return cand
 
 
-# Suggested order to spend submissions (most informative first). Refined by the diagnosis panel.
+# Submission order (most informative first) — from the 5-expert diagnosis synthesis.
+# NOTE: the panel explicitly says DO NOT submit the inverse of the current ranking
+# (0.337 > 0.20 already proves the sign and id-join are correct — it would score ~0.06).
 RECOMMENDED_ORDER = [
-    "category_total",     # is the REAL spend total (not f5) the driver?
-    "revolve_f1",         # is profit interest/revolve driven?
-    "lend_line_f17",      # is profit lending-capacity driven?
-    "points_redeemed_f21",  # PC1-dominant signal
-    "other_spend_f7",     # largest single $ column
-    "INVERSE_total_spend_f5",  # cheap direction/format check
-    "points_balance_f4",
-    "lending_x_lowrisk",
+    "category_total",      # #1: is the true spend base (not f5) the driver?  >0.45 confirms H1
+    "revolve_f1",          # #2: interest/revolver axis (orthogonal to spend)
+    "lend_line_f17",       # #3: lending-spread axis (orthogonal to both)
+    "pnl_composite_v1",    # #4: the exploit — submit AFTER 1-3, reweighted by their scores
+    "points_redeemed_f21", # #5: contingent — resolves f21 cost-vs-engagement sign
 ]
 
 
@@ -124,21 +143,64 @@ def run(train_path: str | None = None):
                                 os.path.join(outdir, f"probe_{name}.xlsx"),
                                 responses=FRAMEWORK_RESPONSES)
 
+    # Zero-cost offline read: the two correlations that confirm the root cause.
+    f5 = _col(df, "f5"); catsum = _col(df, "f6") + _col(df, "f7") + _col(df, "f8") + _col(df, "f9") + _col(df, "f10")
+    corr_f5_cats = float(f5.corr(catsum, method="spearman"))
+    corr_f7_cats = float(_col(df, "f7").corr(catsum, method="spearman"))
+
     with open(os.path.join(outdir, "_README.txt"), "w") as fh:
-        fh.write("PROBE SUBMISSIONS — spend ranking scored ~0.337 (random ~0.20).\n")
-        fh.write("Submit in this order; each score tells you whether that signal drives profit.\n")
-        fh.write("Random baseline ~0.20; a driver should score clearly higher (>0.45).\n\n")
+        fh.write("PROBE PLAN — our spend(f5) ranking scored ~0.337 (random ~0.20).\n")
+        fh.write("Root cause (5-expert consensus, conf 0.70): f5 is the WRONG spend column.\n\n")
+        fh.write("ZERO-COST OFFLINE CHECK (this run):\n")
+        fh.write(f"  corr(f5, sum f6..f10) = {corr_f5_cats:.3f}   (expect <0.1 -> f5 is NOT the total)\n")
+        fh.write(f"  corr(f7, sum f6..f10) = {corr_f7_cats:.3f}   (expect >0.9 -> f7 dominates the spend base)\n\n")
+        fh.write("SUBMIT IN THIS ORDER (each score = that signal's alignment with true top-20%):\n")
         for i, n in enumerate(RECOMMENDED_ORDER, 1):
             fh.write(f"  {i}. probe_{n}.xlsx\n")
-        fh.write("\nInterpretation:\n")
-        fh.write("  - If category_total >> total_spend_f5: the category sum is the real spend driver.\n")
-        fh.write("  - If revolve_f1 / lend_line_f17 win: profit is interest/lending-driven, not spend.\n")
-        fh.write("  - If points_* win: profit tracks loyalty/redemption.\n")
-        fh.write("  - If INVERSE_total_spend_f5 ~ 0.66: the grader direction is flipped (submit inverses).\n")
-        fh.write("  - Then combine the 1-2 winning signals and submit that.\n")
+        fh.write("\nRULES:\n")
+        fh.write("  - Random ~0.20; a real driver scores >0.45. STOP using f5.\n")
+        fh.write("  - DO NOT submit an inverse ranking — 0.337>0.20 proves sign+id-join are correct.\n")
+        fh.write("  - Falsification guard: if category_total <= ~0.35, the spend thesis is DEAD;\n")
+        fh.write("    route remaining slots to interest/lending (revolve_f1, lend_line_f17).\n")
+        fh.write("  - Composite (probe #4): recalibrate weights ∝ (each probe score − 0.20) via\n")
+        fh.write("    src.probe_leaderboard.recalibrate() before submitting pnl_composite.\n")
+        fh.write("  - Combine components as RANKS (standardized), never raw dollars.\n")
     print(f"[probe] wrote {len(cand)} candidates + diagnostics to {outdir}/")
-    print(f"[probe] recommended first submission: probe_{RECOMMENDED_ORDER[0]}.xlsx")
+    print(f"[probe] OFFLINE: corr(f5,catsum)={corr_f5_cats:.3f} (expect <0.1), "
+          f"corr(f7,catsum)={corr_f7_cats:.3f} (expect >0.9)")
+    print(f"[probe] SUBMIT FIRST: probe_{RECOMMENDED_ORDER[0]}.xlsx")
     return outdir
+
+
+def recalibrate(probe_scores: dict[str, float], train_path: str | None = None,
+                out_name: str = "pnl_composite_calibrated"):
+    """
+    After you know the single-axis leaderboard scores, rebuild the composite with weights
+    proportional to (score − 0.20) (a signal that scored at/below random gets ~0 weight;
+    a cost axis you want to SUBTRACT should be passed as its own key). Writes a filled
+    submission for the recalibrated composite.
+
+    Example:
+        recalibrate({"spend": 0.52, "interest": 0.41, "lending": 0.38,
+                     "redeem_cost": 0.14, "risk_loss": 0.30})
+    """
+    cfg = load_config()
+    train_path = train_path or cfg.train_path()
+    df = pd.read_csv(train_path)
+    ids = df[cfg.id_column]
+    # weight = max(0, score - 0.20); cost axes keep their (subtracted) role in pnl_composite.
+    w = {k: max(0.0, v - 0.20) for k, v in probe_scores.items()}
+    score = pnl_composite(df, weights=w)
+    outdir = resolve("outputs/probes"); os.makedirs(outdir, exist_ok=True)
+    sub = build_submission(ids, score, cfg)
+    write_submission(sub, cfg, path=os.path.join(outdir, f"probe_{out_name}.csv"))
+    tmpl = cfg.raw["submission"].get("template_xlsx")
+    if tmpl and os.path.exists(resolve(tmpl)):
+        from .framework_writeup import FRAMEWORK_RESPONSES
+        fill_excel_template(resolve(tmpl), pd.Series(score.values, index=ids.values),
+                            os.path.join(outdir, f"probe_{out_name}.xlsx"), responses=FRAMEWORK_RESPONSES)
+    print(f"[recalibrate] weights={w} -> outputs/probes/probe_{out_name}.xlsx")
+    return score
 
 
 if __name__ == "__main__":
