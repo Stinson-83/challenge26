@@ -32,4 +32,4 @@ Risk: −1.93·(risk×revolve) expected loss, −$369 −0.93·balance per colle
 fits, mean-rank tie-broken), all 500,000 ids. The consensus moves ~23% of the top-20% set
 relative to the prior best (0.768), the size of the gap to the leaders.
 
-Expected score from method validation: **~0.85–0.93** (banked floor: 0.768).
+**ACTUAL PUBLIC SCORE: 0.900** — dead-center of the validated 0.85–0.93 prediction.
