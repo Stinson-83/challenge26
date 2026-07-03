@@ -55,3 +55,22 @@ within 10,000 members of a known set). Round 2:
 
 Submission: `outputs/FINAL_R2_PROJECTED.xlsx`. Iteration continues: each new score becomes
 constraint #11, #12, … — the ladder toward 0.97.
+
+---
+
+## Round 3 — post-mortem of 0.880 and the champion-anchored fix
+
+**Why R2 dropped (0.900 → 0.880):** (1) exact projection onto rounded, split-noisy
+measurements = fitting noise (fits reached wRMSE 0.0009, far below the ±0.0015 noise floor);
+(2) moved 10k members on identifiability the data didn't support — set algebra shows the
+swaps were better than random but net −2k.
+
+**Round-3 fixes:** eleven constraints (0.880 added; both anchors double-weighted);
+**deadband loss** (zero reward inside the noise floor); ratio terms (utilization,
+redemption-rate); **manifold walk** for genuine ensemble diversity (heavy perturbation +
+re-descent; 6 noise-floor solutions, agreement 0.868–0.940); **champion-anchored assembly** —
+start from the 0.900 set, relocate only the J highest-confidence members, J chosen by
+worst-case-over-ensemble prediction with a 50% empirical haircut. The ensemble's own risk
+curve peaked at J=3,000 and degraded past 5,000, independently confirming the R2 lesson.
+
+Submission: `outputs/FINAL_R3_ANCHORED.xlsx` (97% of the champion kept; 3,000 swaps).
