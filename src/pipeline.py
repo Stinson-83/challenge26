@@ -23,7 +23,7 @@ import pandas as pd
 
 from . import (clustering, diagnostics, dimensionality, eda, evaluation, outliers,
                scoring, visualization)
-from .config import load_config
+from .config import load_config, resolve
 from .data_io import load_dataset, save_df
 from .feature_engineering import engineer_features
 from .preprocessing import clean, feature_columns, infer_column_roles
@@ -148,6 +148,23 @@ def run(config_path: str | None = None, framework: str | None = None,
     fw_subs = write_all_framework_submissions(result.scores, cfg, outdir=outdir, template_path=template)
     log(f"[12] Primary submission: {sub_path}  ({len(sub):,} rows). "
         f"Per-framework submissions: {len(fw_subs)} in {outdir}/ (submit each; keep the best public score).")
+
+    # ---- 12b. Fill the official Unstop .xlsx template (Predictions + write-up) -----
+    tmpl_xlsx = cfg.raw["submission"].get("template_xlsx")
+    if tmpl_xlsx and os.path.exists(resolve(tmpl_xlsx)) and is_real:
+        from .submission import fill_excel_template
+        from .framework_writeup import FRAMEWORK_RESPONSES
+        preds = pd.Series(result.primary_rank.values, index=ids.values)
+        filled = resolve(cfg.raw["submission"].get(
+            "filled_xlsx", "outputs/campus_challenge_r1_submission_FILLED.xlsx"))
+        info = fill_excel_template(
+            template_path=resolve(tmpl_xlsx), predictions=preds, out_path=filled,
+            responses=FRAMEWORK_RESPONSES,
+            id_header=cfg.raw["submission"].get("template_id_header", "ID"),
+            pred_header=cfg.raw["submission"].get("template_pred_header", "Prediction"))
+        log(f"[12b] Filled Unstop template -> {filled} "
+            f"(predictions {info['filled']:,}, missing {info['missing']}, "
+            f"unfilled sections {info['unfilled_sections']})")
 
     # ---- artefacts ----------------------------------------------------------------
     save_df(result.scores, os.path.join(outdir, "all_framework_scores.csv"))

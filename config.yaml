@@ -216,5 +216,12 @@ submission:
   # Column names are overwritten to match the Unstop template at build time.
   id_out_name: id
   score_out_name: profitability_score
+  # Official Unstop .xlsx template. When set, the pipeline ALSO produces a filled copy:
+  # 'Predictions' sheet gets the active framework's score for every id, and the
+  # 'Profitability Framework' sheet is populated from src/framework_writeup.py.
+  template_xlsx: templates/submission_template.xlsx
+  filled_xlsx: outputs/campus_challenge_r1_submission_FILLED.xlsx
+  template_id_header: ID
+  template_pred_header: Prediction
 
 random_seed: 42

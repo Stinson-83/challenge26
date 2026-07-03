@@ -99,6 +99,79 @@ def write_all_framework_submissions(scores: pd.DataFrame, cfg: Config | None = N
     return paths
 
 
+def fill_excel_template(
+    template_path: str,
+    predictions,
+    out_path: str,
+    responses: dict | None = None,
+    pred_sheet: str = "Predictions",
+    fw_sheet: str = "Profitability Framework",
+    id_header: str = "ID",
+    pred_header: str = "Prediction",
+) -> dict:
+    """
+    Fill the official Unstop .xlsx submission template IN PLACE (preserving its exact
+    structure) and save to out_path.
+
+    - Predictions sheet: writes `predictions` (Series indexed by id, or {id: score} dict)
+      into the Prediction column, matched by the ID in each row (order-independent, so every
+      id gets its own score even if the template's ordering differs).
+    - Profitability Framework sheet: writes `responses` (a {Section: text} dict) into the
+      Response column for each matching Section label.
+
+    Returns {'filled': n, 'missing': n, 'unfilled_sections': [...]}.
+    """
+    import openpyxl
+
+    pred = predictions if isinstance(predictions, dict) else dict(
+        zip(predictions.index.tolist(), predictions.values.tolist()))
+    # Normalise keys to int where possible for robust matching against integer IDs.
+    norm = {}
+    for k, v in pred.items():
+        try:
+            norm[int(k)] = v
+        except (TypeError, ValueError):
+            norm[k] = v
+
+    wb = openpyxl.load_workbook(template_path)  # writable (keeps formatting/structure)
+
+    ws = wb[pred_sheet]
+    headers = [c.value for c in ws[1]]
+    id_idx = headers.index(id_header) + 1
+    pred_idx = headers.index(pred_header) + 1
+    n_filled = n_missing = 0
+    for row in ws.iter_rows(min_row=2):
+        idv = row[id_idx - 1].value
+        if idv is None:
+            continue
+        key = int(idv) if isinstance(idv, (int, float)) and float(idv).is_integer() else idv
+        val = norm.get(key, norm.get(idv))
+        if val is None:
+            n_missing += 1
+        else:
+            row[pred_idx - 1].value = float(val)
+            n_filled += 1
+
+    unfilled = []
+    if responses:
+        fw = wb[fw_sheet]
+        fw_headers = [c.value for c in fw[1]]
+        resp_idx = (fw_headers.index("Response") + 1) if "Response" in fw_headers else 2
+        for row in fw.iter_rows(min_row=2):
+            section = row[0].value
+            if section is None:
+                continue
+            if section in responses:
+                row[resp_idx - 1].value = responses[section]
+            else:
+                unfilled.append(section)
+
+    import os
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    wb.save(out_path)
+    return {"filled": n_filled, "missing": n_missing, "unfilled_sections": unfilled}
+
+
 def top_flag_submission(ids: pd.Series, ranking: pd.Series, top_pct: float,
                         cfg: Config | None = None) -> pd.DataFrame:
     """Alternative format: a 0/1 flag marking the predicted top-`top_pct` (some templates
