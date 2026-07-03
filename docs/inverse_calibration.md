@@ -84,3 +84,23 @@ percentile knots so the family can express thresholds/tiers; warm refits + manif
 (5 noise-floor equations, agreement 0.90–0.92). This round the pessimistic risk curve ROSE
 monotonically through J=6,000 (no R3-style cliff), so the movement budget was set at
 **J=5,000** (pred min 0.934 / med 0.956). Submission: `outputs/FINAL_R4_ANCHORED.xlsx`.
+
+## Round 5 — leaderboard cross-validation + cross-family consensus
+
+R4 (J=5000) regressed to 0.909, confirming with R2 that deep formula-guided swaps bleed
+members whose correctness the family cannot explain. Round-5 innovations:
+
+1. **Leaderboard cross-validation** (novel, zero submission cost): hold out each graded
+   submission, refit on the rest, test whether the family PREDICTS the held-out score.
+   Result: the **normalized-attribute family** (per-feature log + percentile-rank terms +
+   revolver/transactor segments, 82 terms) generalizes better than the raw-dollar family
+   (mean held-out error 0.020 vs 0.027) — evidence the organizer's formula weights
+   normalized attributes, as production scorecards do. CV also quantified ~2,500 champion
+   members whose correctness NO family explains (held-out fits under-predict the champions
+   by ~0.02) — the structural reason deep swaps fail.
+2. **Cross-family consensus assembly**: 4 dollar-family + 5 normalized-family noise-floor
+   fits; a swap requires BOTH families to independently agree (drop only if both reject,
+   add only if both endorse). The J-curve peaked at 1,500–2,000 and declined after — a
+   finite, real high-confidence pool. Chose J=2,000 (98% of the 0.912 champion kept).
+
+Submission: `outputs/FINAL_R5_CV.xlsx`.
