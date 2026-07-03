@@ -1,18 +1,17 @@
-# Real competition data (do not commit — download from Unstop)
+# Real competition data (do NOT commit — download from Unstop; large & proprietary)
 data/train.csv
 data/test.csv
 data/*.xlsx
 data/*.parquet
 
-# Generated artefacts
-outputs/*.csv
-outputs/*.png
-outputs/*.json
-
-# Python
+# Python caches
 __pycache__/
 *.pyc
+.pytest_cache/
 .ipynb_checkpoints/
 .venv/
 venv/
 .DS_Store
+
+# Example outputs (submissions, plots, reports) ARE committed so the deliverable is
+# viewable without running — see outputs/README.md. They regenerate on every pipeline run.

@@ -1,0 +1,35 @@
+{
+  "n_rows": 60000,
+  "is_real_data": false,
+  "active_framework": "rank_ensemble",
+  "runtime_sec": 50.2,
+  "role_counts": {
+    "identifier": 1,
+    "dollar": 11,
+    "count": 7,
+    "ratio": 1,
+    "score": 4
+  },
+  "framework_agreement_min_overlap": 0.7733,
+  "most_profitable_kmeans_cluster": 3,
+  "submission_path": "/home/user/challenge26/outputs/submission.csv",
+  "plots": {
+    "correlation": "/home/user/challenge26/outputs/correlation_heatmap.png",
+    "distributions": "/home/user/challenge26/outputs/feature_distributions.png",
+    "pca": "/home/user/challenge26/outputs/pca_scatter.png",
+    "clusters": "/home/user/challenge26/outputs/cluster_scatter.png",
+    "outliers": "/home/user/challenge26/outputs/outlier_plot.png",
+    "score_dist": "/home/user/challenge26/outputs/profitability_distributions.png",
+    "overlap": "/home/user/challenge26/outputs/framework_overlap.png",
+    "cluster_profit": "/home/user/challenge26/outputs/cluster_profitability.png"
+  },
+  "validation_best": {
+    "framework": "dollar_pnl",
+    "spearman": 0.7974000642685112,
+    "acc_top5": 0.943,
+    "acc_top10": 0.9212,
+    "acc_top20": 0.8676,
+    "top_decile_profit_capture": -7.940071480179502,
+    "acc_top30": NaN
+  }
+}
