@@ -1,23 +1,23 @@
 {
   "total_spend_consistency": {
     "check": "total_spend_consistency",
-    "median_f5_over_catsum": 1.0,
-    "frac_rows_f5_equals_catsum": 1.0,
-    "verdict": "f5 == sum(categories): use f5 as clean total (corroborator redundant)"
+    "median_f5_over_catsum": 0.0773,
+    "frac_rows_f5_equals_catsum": 0.0188,
+    "verdict": "f5 differs from category sum: f5 is a broader/independent total \u2014 keep both"
   },
   "credit_line_redundancy": {
     "check": "credit_line_redundancy",
-    "spearman": 0.9243,
-    "frac_f18_le_f17": 1.0,
+    "spearman": 0.9333,
+    "frac_f18_le_f17": 0.8608,
     "verdict": "near-duplicate credit lines (expected)"
   },
   "risk_sign_sanity": {
     "check": "risk_sign_sanity",
     "corr_f11_with": {
-      "collection_f3": 0.0783,
-      "cancel_f2": 0.1976,
-      "revolve_f1": 0.106,
-      "spend_f5": -0.2715
+      "collection_f3": 0.4523,
+      "cancel_f2": -0.1754,
+      "revolve_f1": 0.5759,
+      "spend_f5": -0.0456
     },
     "verdict": "risk sign OK (co-moves with distress)"
   }

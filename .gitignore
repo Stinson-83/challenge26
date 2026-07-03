@@ -15,3 +15,5 @@ venv/
 
 # Example outputs (submissions, plots, reports) ARE committed so the deliverable is
 # viewable without running — see outputs/README.md. They regenerate on every pipeline run.
+outputs/all_framework_scores.csv
+outputs/scorecard.csv
