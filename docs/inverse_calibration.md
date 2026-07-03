@@ -74,3 +74,13 @@ worst-case-over-ensemble prediction with a 50% empirical haircut. The ensemble's
 curve peaked at J=3,000 and degraded past 5,000, independently confirming the R2 lesson.
 
 Submission: `outputs/FINAL_R3_ANCHORED.xlsx` (97% of the champion kept; 3,000 swaps).
+
+## Round 4 — 0.912 banked; hinge terms + deeper calibrated swaps
+
+R3 delivered 0.912 (+0.012), landing exactly on the calibrated 50%-of-predicted rule, with the
+top-3,000 swaps running +40% net accuracy (vs R2's 10k at −20%) — the marginal-quality curve
+is real and measurable. Round 4: twelve constraints; **hinge terms** at spend/balance/risk
+percentile knots so the family can express thresholds/tiers; warm refits + manifold walk
+(5 noise-floor equations, agreement 0.90–0.92). This round the pessimistic risk curve ROSE
+monotonically through J=6,000 (no R3-style cliff), so the movement budget was set at
+**J=5,000** (pred min 0.934 / med 0.956). Submission: `outputs/FINAL_R4_ANCHORED.xlsx`.
