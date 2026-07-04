@@ -8,19 +8,25 @@ unsupervised setting, optimised for the competition's **top-20% overlap accuracy
 > **Metric:** accuracy = % overlap between the actual top-20% most-profitable cardmembers and
 > our predicted top-20%. Only the ranking near/above the 80th percentile matters.
 
-**Status:** FINAL public score = **0.900** top-20% overlap (random ≈ 0.20; leader 0.93), climbing
-0.337 → 0.668 → 0.726 → 0.768 → **0.900**. The final jump came from **inverse calibration**:
-treating our nine graded submissions as measurements of the hidden label and solving for the
-dollar-P&L equation that reproduces all nine scores simultaneously (validated at 0.88–0.93
-recovery on simulated truths — landed 0.900). Winning file: **`outputs/FINAL_INVERSE_FIT.xlsx`**;
-method: **`docs/inverse_calibration.md`**; history: **`docs/leaderboard_results.md`**.
+**Status:** The defensible deliverable is the **CONSENSUS of two data-motivated models**, validated
+**leaderboard-free** by the neutral robustness harness in `src/robustness/`. The two members are
+`honest_0768` — the LB-validated **0.768** top-20% overlap baseline
+(`rank(0.573·R(cats) + 0.427·R(f1) − 0.18·R(f11·f1) − 0.15·R(f3) − 0.06·R(f21))`, verified this
+session to reproduce `FINAL_SUBMISSION_0.768.xlsx` bit-exactly) — and `rebuilt_v1`
+(`rank(0.60·catavg + 0.40·R(f1) − 0.18·R(f11·f1) − 0.12·f3)`, using scale-fair category spend,
+disjoint `f3`, and principled leaderboard-free weights). **Recommended submission:**
+**`outputs/submissions_v2/FINAL_REBUILT_CONSENSUS.xlsx`** (the rank-average of the two).
 
-Final model: a consensus of six independently-fitted **dollar P&L equations** (per-category
-interchange margins, revolve interest, fee revenue, benefit/points costs, servicing, expected
-loss `f11·f1`, collection `f3 + f3·f1`, cancellations) — each of which reproduces all nine of
-our graded submissions' scores to ±0.005. Fitted coefficients:
-`outputs/inverse_fit_coefficients.json`. The earlier hand-calibrated rank model
-(`0.573·rank(Σ f6..f10) + 0.427·rank(f1) − costs`, 0.768) remains as the interpretable baseline.
+> **Quarantined — do NOT submit.** The inverse-calibration files (`FINAL_INVERSE_FIT` and the
+> R2–R5 rounds, `docs/inverse_calibration.md`) are **public-leaderboard overfitting, not a private-LB
+> edge**: reconstructing a 100k-of-500k top-20% set from ~10 public scores is under-determined by
+> ~4,000×, the fitted coefficients sign-flip across rounds, expected private score is ~0.64–0.68 (at
+> or below the honest base, not 0.90+), the optimizer code is absent (unreproducible), and the rounds
+> imply 13–14 graded submissions against the 10-cap. This is exactly the "misuse or gaming" the rules
+> warn against — see the banner atop `docs/inverse_calibration.md`.
+
+Full record: **`docs/technical_review.md`** and **`docs/rebuild_results.md`**;
+harness: **`src/robustness/README.md`**.
 
 ---
 
@@ -103,8 +109,10 @@ The submission is an `.xlsx` workbook with two sheets — a `Predictions` sheet 
 - Framework sheet ← the responses in `src/framework_writeup.py` (edit these if you submit a
   different prediction column so your methodology and predictions stay consistent).
 
-Recommended play with your 10 submissions: upload `group_consensus` (the filled `.xlsx`), plus
-`revenue_first` and `dollar_pnl` as A/B tests, and keep the best public score.
+Recommended play with your 10 submissions: submit the **rebuilt consensus**
+(`outputs/submissions_v2/FINAL_REBUILT_CONSENSUS.xlsx`), the leaderboard-free deliverable validated
+by `src/robustness/`; `honest_0768` and `rebuilt_v1` are available as its individual members. Do
+**not** submit the quarantined inverse-calibration files (`FINAL_INVERSE_FIT` / R2–R5).
 
 ---
 
@@ -140,6 +148,10 @@ challenge26/
 | `relationship` | Rewards engaged power-users, penalises coupon-clippers. |
 | `dollar_pnl` | Literal `$` P&L (kept for A/B; mis-scaled on real data — excluded from the primary). |
 | `rank_ensemble` **(primary)** | Rank-average of the four scale-immune frameworks (= `group_consensus`). |
+
+> **Note:** "`f5` = Total Spend" is **refuted by the real data** (Spearman(f5, Σf6..f10)=0.013;
+> f5 is ~1/12 the scale of the category sum and fails the rewards-accrual check). The recommended
+> `rebuilt_v1`/consensus therefore ranks on **category spend** (`Σ/avg f6..f10`), not `f5`.
 
 ## Rules compliance
 - The `id` (identifier) is **never used** inside any equation — only carried to the output.

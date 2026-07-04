@@ -31,9 +31,14 @@ autodetect:
   id_unique_frac: 0.98          # near-unique monotonic integer -> identifier
 
 # -------------------------------------------------------------------------------------
-# TRUE semantic map — feature meanings are now KNOWN (data/feature_description.csv).
-# Remaining uncertainty is only the SIGN/WEIGHT in the profit equation (business modelling),
-# NOT feature identity, so confidences are high. economic_role in:
+# INFERRED semantic map — feature meanings are NOT known. Amex MASKS the columns; the labels
+# in data/feature_description.csv are HYPOTHESES, and the `confidence` values below are our
+# own priors, not verified identities. At least one label is REFUTED by the real data:
+# f5 is NOT "Total Spend = sum of the category components" — on the 500k data Spearman(f5,
+# sum f6..f10) = 0.013 (Pearson 0.099), f5 is ~1/12 the scale of the category sum, and f5 <
+# sum-of-its-parts in 88% of rows. Treat every `meaning`/`group` below as a working guess.
+# The pipeline also auto-detects roles from statistical signatures and flags disagreements.
+# economic_role in:
 #   revenue | cost | risk | engagement | relationship | identifier
 # profit_sign in: positive | negative | ambiguous | exclude
 # group is the aggregation bucket the profitability frameworks operate on.
@@ -171,14 +176,10 @@ frameworks:
       rank-corr ~0.13). The ensemble now averages the four SCALE-ROBUST (percentile-rank)
       spend-dominant frameworks, which agree 82-97%. dollar_pnl remains available standalone
       for leaderboard A/B testing. See docs/real_data_findings.md.
-    weights_note: >
-      Rank-averaged. dollar_pnl gets the PLURALITY because Amex's true target is itself a
-      dollar P&L (Profit = Revenue - Cost - Risk), so the literal dollar model is the best
-      structural match; revenue_first/relationship/full_pnl are robustness ballast that
-      hedge coefficient mis-specification. risk_adjusted is excluded (its multiplicative
-      risk discount is most sensitive to the f11 risk-sign uncertainty). The pipeline also
-      emits EVERY framework as its own submission file so the PUBLIC LEADERBOARD — not our
-      synthetic proxy — makes the final call between pure dollar_pnl and this ensemble.
+    # NOTE: an older `weights_note` was REMOVED here as STALE — it claimed "dollar_pnl gets
+    # the PLURALITY" and "risk_adjusted is excluded", which directly contradicts the ACTIVE
+    # `members`/`member_weights` above (dollar_pnl is NOT a member; risk_adjusted IS, at 0.20).
+    # weights_note_v2 (above) is the authoritative, current description.
 
 # -------------------------------------------------------------------------------------
 # Optional boundary guards (final precision protection). Narrow by design so they touch

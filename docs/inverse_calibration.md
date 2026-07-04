@@ -1,4 +1,23 @@
-# Inverse Calibration — reverse-engineering the profitability label from leaderboard scores
+# [QUARANTINED] Inverse Calibration — reverse-engineering the profitability label from leaderboard scores
+
+> ## ⚠️ CAUTION — DO NOT USE OR SUBMIT
+> **This document describes LEADERBOARD PROBING / public-leaderboard overfitting. It is NOT a valid
+> submission method and must not be used or submitted.** The content below is retained unchanged only as
+> a cautionary record of a rejected approach.
+>
+> Audit verdict (see `docs/technical_review.md`):
+> - **Under-determined by ~4,000x.** Reconstructing a 100k-of-500k top-20% set requires ~360,955 bits of
+>   information, but ~10 public scores supply only ~81–100 bits. The "fit" cannot identify the target set.
+> - **The coefficients are not real.** They sign-flip across rounds (R2–R5); only the honest base signal is
+>   identifiable. The rest is fitting rounding/split noise below the leaderboard noise floor.
+> - **Expected PRIVATE score ~0.64–0.68** — at or *below* the honest 0.768 base. The public 0.90+ figures do
+>   not transfer to the private leaderboard.
+> - **Not reproducible and against the rules.** The optimizer code is absent from the repo; the R2–R5 rounds
+>   imply 13–14 graded submissions against the 10-submission cap; this is exactly the "misuse or gaming" the
+>   competition rules police.
+>
+> **Use the honest, validated solution instead.** Recommended submission:
+> `outputs/submissions_v2/FINAL_REBUILT_CONSENSUS.xlsx`. Full audit and rationale: `docs/technical_review.md`.
 
 ## The idea (the final innovation)
 After 9 graded submissions, each public score is a *measurement* of the hidden label:

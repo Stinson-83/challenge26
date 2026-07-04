@@ -3,15 +3,36 @@
 Analysis of the actual competition run (`outputs/run_summary.json`: 500,000 rows,
 `is_real_data: true`). This supersedes the synthetic-validation guidance where they differ.
 
+> **Note:** On the *modelling* recommendation, this file is superseded by
+> `docs/technical_review.md` + `docs/rebuild_results.md` (the honest LB-validated 0.768 model and
+> the rebuilt consensus). The diagnostics below (segments, dollar_pnl mis-scaling) remain valid.
+
 ## 1. Run health ✅
 - 500,000 rows scored in ~63s; submission is one row per id, correct `id, profitability_score` format.
-- Column roles auto-detected correctly (11 dollar, 1 ratio = f11 risk, 1 binary = f2, 1 rare-flag = f3, 3 score, 6 count). **No missing values** in the real data.
+- Column roles auto-detected correctly (11 dollar, 1 ratio = f11 risk, 1 binary = f2, 1 rare-flag = f3, 3 score, 6 count).
+- **Missing values are pervasive (the earlier "no missing values" claim is FALSE).** Per-column missing %:
+
+  | Col | Miss % | Col | Miss % | Col | Miss % |
+  |---|---|---|---|---|---|
+  | f1 | 0.00 | f9 | 23.14 | f17 | 58.45 |
+  | f2 | 0.00 | f10 | 23.14 | f18 | 61.89 |
+  | f3 | 0.00 | f11 | 0.50 | f19 | 0.004 |
+  | f4 | 51.45 | f12 | 5.00 | f20 | 0.02 |
+  | f5 | 1.27 | f13 | 2.74 | f21 | 51.45 |
+  | f6 | 23.14 | f14 | 2.74 | f22 | 18.93 |
+  | f7 | 23.14 | f15 | 2.74 | f23 | 87.79 |
+  | f8 | 23.14 | f16 | 2.74 | | |
+
+  **97.17% of rows have ≥1 missing value; only 2.83% (14,153 rows) are complete.**
+  `outputs/data_quality_report.json` reports `frac_missing 0.0` for every column ONLY because the
+  pipeline zero-imputes *before* the quality check (e.g. it reports f7 mean 23,689 = the zero-filled
+  mean vs the true complete-case 30,822), so that report understates real missingness.
 
 ## 2. Diagnostics (real-data reality checks)
 | Check | Result | Verdict |
 |---|---|---|
-| **f5 vs Σ(categories)** | f5 mean **\$3,421** vs category sum **~\$37,000** (f7 "Other" alone \$23,690). Near-uncorrelated (corr w/ spend-proxy: f5=0.74, categories ≈0.00–0.03); load oppositely on PC1. | f5 is a **clean, self-consistent spend signal**; f6–f10 are a differently-scaled, weakly-related set. Keep f5 primary, categories a minor corroborator (as configured). |
-| **Risk sign** | corr(f11, collection f3)=0.45, corr(f11, revolve f1)=0.58, corr(f11, spend f5)=−0.05 | Higher f11 = riskier. **Negative sign correct.** |
+| **f5 vs Σ(categories)** | f5 mean **\$3,421** vs category sum **~\$37,000** (f7 "Other" alone \$23,690). Spearman(f5, Σf6…f10)=0.013; f5 < Σ-of-parts in 88% of rows; f5 fails the rewards-accrual check (Σcategories correlates +0.31/+0.24 with f4/f21, f5 only +0.03/+0.02). | **f5 is NOT the category total and is a weak spend signal** (public probe: f5-alone 0.337 ≈ random vs category-sum 0.668). **Use f6–f10 as the interchange base; exclude f5.** *(This corrects the earlier "keep f5 primary" conclusion, which rested on a circular spend-proxy correlation.)* |
+| **Risk sign** | corr(f11, collection f3)=0.45, **Spearman** corr(f11, revolve f1)=0.58 (Pearson only ~0.20), corr(f11, spend f5)=−0.05 | Higher f11 = riskier. **Negative sign correct.** |
 | **Credit lines** | f17/f18 Spearman 0.93 | Near-duplicate (as expected). |
 
 ## 3. 🔴 dollar_pnl mis-scales on the real data (the key fix)

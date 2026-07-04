@@ -101,7 +101,7 @@ economic role and profit sign we assign each — the modelling judgement, not th
 
 | Feature | Meaning | Role | Sign | Notes |
 |---|---|---|---|---|
-| f5 | **Total Spend 12m** | Revenue | **+ (dominant)** | Primary driver = interchange base. |
+| f5 | Labelled "Total Spend 12m" | Revenue | **excluded** | REFUTED as the category-sum (Spearman ~0.01, ~1/12 the scale, below Σ-parts in 88% of rows); f6…f10 are the interchange base. |
 | f6 | Airlines Spend | Revenue | + (thin) | 5× category → lower net margin (rewards drag). |
 | f9 | Lodging Spend | Revenue | + (thin) | 5× category → lower net margin. |
 | f7 | Other Spend | Revenue | + | 1× category (catch-all). |
@@ -127,13 +127,17 @@ economic role and profit sign we assign each — the modelling judgement, not th
 | id | identifier | — | exclude | Never used in the equation (rule). |
 
 **Key structural facts we exploit:**
-- **f5 = Total Spend = Σ(f6…f10)** (verified by `diagnostics.total_spend_consistency`). So we
-  use **f5 as the clean total** and the category split (f6, f9 = 5×) only for the *margin*
-  adjustment — never re-summing categories into the total (avoids double-counting).
+- **f5 is NOT the category total** — data forensics REFUTE `f5 = Σ(f6…f10)`:
+  Spearman(f5, Σf6…f10) ≈ 0.01, f5 is ~1/12 the scale of the category sum, f5 sits *below*
+  the sum of its own parts in 88% of rows, and f5 fails the rewards-accrual check (the
+  category sum correlates +0.31/+0.24 with points balance / points redeemed, while f5 is only
+  +0.03/+0.02). So we treat the **category spends f6…f10 as the interchange base** (summed
+  then ranked) and **exclude f5** from the spend total. The category split (f6, f9 = 5×) still
+  drives the *margin* adjustment.
 - **f4 ≈ 570k values are POINTS, not dollars** — treating them as spend would have been a
   large error. Fixed.
-- **Confidence in identity is now high (~0.9);** the only remaining judgement is the *weight*
-  of each second-order term, which we keep small and robust.
+- **We no longer assume a clean spend identity;** the remaining judgement is the *weight* of
+  each second-order term, which we keep small and robust.
 
 ---
 
@@ -146,7 +150,7 @@ in two complementary ways.
 Every signal → a **robust percentile score in [0,1]** (rank-based ⇒ immune to scale, skew,
 and the f4/f5 outliers), sign-corrected so higher = more profitable. Monetary buckets are
 aggregated as **raw-dollar sums then ranked** (preserving total-volume ordering, which *is*
-interchange). Groups: `spend` (f5), `spend_cat` (f6…f10 corroborator), `revolve` (f1),
+interchange). Groups: `spend_cat` (f6…f10, the interchange base — summed then ranked; f5 excluded), `revolve` (f1),
 `credit_line` (f17/f18), `points` (f4/f21), `engagement` (f12/f22/f23), `relationship`
 (f19/f20), `risk` (f11), `attrition` (f2), `collection` (f3), `benefit_cost` (f13–f16).
 
@@ -156,8 +160,8 @@ overturn a full spend decile).
 
 ### (b) Dollar-grounded P&L (structural match to the target)
 ```
-Revenue   = 0.022·TotalSpend(f5) + interest·Revolve(f1)
-Rewards   = 0.011·TotalSpend(f5) + drag·(Airlines f6 + Lodging f9)      # 5× drag, net still +
+Revenue   = 0.022·TotalSpend(Σf6…f10) + interest·Revolve(f1)
+Rewards   = 0.011·TotalSpend(Σf6…f10) + drag·(Airlines f6 + Lodging f9)      # 5× drag, net still +
 Benefit   = AirlineCredit(f14) + EntCredit(f16) + louncost·Lounge(f13) + cabcost·CabUse(f15)
 RiskLoss  = RiskScore(f11) · Revolve(f1) · LGD
 Servicing = call·CancelCalls(f2) + collection·CollectionCalls(f3)
@@ -170,8 +174,9 @@ gross-spend rank.
 ### Ensuring robustness (no label to fit)
 - **Percentile/rank transforms** everywhere → robust to outliers and to whether the true
   target is linear or concave in dollars.
-- **Rank ensemble** of the dollar P&L (plurality) + revenue-first + relationship + full P&L
-  → hedges coefficient mis-specification and stabilises the 80th-percentile boundary.
+- **Rank ensemble** of the active members `revenue_first` (0.30) + `relationship` (0.25) +
+  `full_pnl` (0.25) + `risk_adjusted` (0.20) — `dollar_pnl` was removed — hedges coefficient
+  mis-specification and stabilises the 80th-percentile boundary.
 - **We do NOT fit weights to any data** (fitting to our synthetic would overfit our own
   assumptions). Weights are business priors; the **public leaderboard** chooses between the
   ensemble and pure dollar-P&L via the per-framework submission files.

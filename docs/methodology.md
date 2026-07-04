@@ -57,12 +57,23 @@ outliers, plots) auto-subsamples to ≤80k rows; **the submission scores always 
 | **risk_adjusted** | Tail losses dominate downside; discount revenue multiplicatively by risk/attrition/collection. | `base·(1−a·risk)·(1−b·attr)·(1−d·coll) − c·benefit`. |
 | **relationship** | Reward engaged power-users; penalise coupon-clippers (benefit ≫ spend). | Linear + `benefit_efficiency` penalty. |
 | **dollar_pnl** | Literal Profit = Revenue − Cost − Risk in **dollars**; encodes the 5× rewards drag. | Raw-dollar P&L → percentile rank. |
-| **rank_ensemble** (primary) | Rank-average: dollar_pnl (0.40) + revenue_first (0.25) + relationship (0.20) + full_pnl (0.15). | Weighted mean of member ranks. |
+| **rank_ensemble** (primary) | Rank-average: revenue_first (0.30) + relationship (0.25) + full_pnl (0.25) + risk_adjusted (0.20). | Weighted mean of member ranks. |
 
-`risk_adjusted` is excluded from the ensemble: its multiplicative risk discount is the most
-sensitive to the f11 risk-sign uncertainty (the single biggest ranking risk).
+`dollar_pnl` is excluded from the active ensemble: its raw-dollar P&L is the most sensitive to
+the untested rewards-drag / benefit-unit-cost assumptions. The four rank-space members above
+([revenue_first, relationship, full_pnl, risk_adjusted] at [0.30, 0.25, 0.25, 0.20]) are the
+active list; `risk_adjusted` is included but held to the smallest weight because its
+multiplicative risk discount is the most sensitive to the f11 risk-sign uncertainty.
 
 ## 4. Validation protocol (honest, non-circular)
+
+> **SUPERSEDED.** The synthetic-only validation described in this section has been replaced by
+> the neutral, leaderboard-free **robustness harness** (`src/robustness/`, see
+> `docs/rebuild_results.md`). The original synthetic validation was in fact circular: its hidden
+> "truth" shared `dollar_pnl`'s functional form, so it structurally favoured `dollar_pnl`/the
+> ensemble rather than testing them. The harness instead measures worst-case top-20% recovery
+> across multiple independent synthetic economies plus sensitivity and construct-validity checks.
+> The results below are retained only as a historical record of the earlier protocol.
 
 Because there is no label, we validate the *pipeline and the approach* on a **synthetic
 dataset that mirrors the true schema** and carries a **hidden Amex-style dollar P&L** whose
