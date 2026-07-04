@@ -1,4 +1,4 @@
-# Rebuild Results — data-motivated model + principled weights (roadmap R1–R7)
+git # Rebuild Results — data-motivated model + principled weights (roadmap R1–R7)
 
 **Scored by the neutral harness (`src/robustness/`), leaderboard-free.** Reproduce with
 `python -m src.robustness.rebuild`. Companion to `docs/technical_review.md`.
